@@ -22,5 +22,5 @@ ReactDOM.render(
 setInterval(
             function () {
     window.location.reload(false)
-}, 30000
+}, 1800000
 )

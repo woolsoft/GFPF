@@ -15,7 +15,7 @@ const enhance = compose(
         // "Looping" trough the images array
         imageIndex = (imageIndex + 1) % amountOfImages
           this.props.setCurrentImage(images[imageIndex])
-      }, 2000)
+      }, 20000)
     },
 
     componentWillUnmount() {
