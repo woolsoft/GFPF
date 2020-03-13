@@ -5,8 +5,9 @@ import compose from 'recompose/compose'
 import withHandlers from 'recompose/withHandlers'
 import lifecycle from 'recompose/lifecycle'
 import withState from 'recompose/withState'
-import { ImageCirculation } from './image-circulation'
-import { ImageWrapper } from './common'
+import {
+  ImageWrapper
+} from './common'
 
 const ImageContainer = styled.div`
   height: 100vh;
@@ -29,15 +30,23 @@ const BottomSection = styled(Section)`
 const enhance = compose(
   withState('images', 'setImages', []),
   withState('activeImage', 'setActiveImage', ''),
-  withState('displayCirculation', 'setDisplayCirculation', false),
+  withState('imageIndex', 'setImageIndex', 0),
   withHandlers({
-    fetchImages: ({ setImages, images }) => () => {
-        fetch(`http://localhost:5000/images/omi`)
+    fetchImages: ({
+      setImages,
+      images,
+      imageIndex,
+      setImageIndex
+    }) => () => {
+      fetch(`http://localhost:5000/images/omi`)
         .then(res => (res.ok ? res.json() : Promise.reject(res)))
-        .then(({ body }) => {
-          const newImages = newImagestoArrayStart(body, images);
-          console.log(images,body,newImages)
+        .then(({
+          body
+        }) => {
+          const {newImages, newIndex} = newImagestoArrayStart(body, images, imageIndex);
+          console.log("set order", newImages)
           setImages(newImages);
+          setImageIndex(newIndex);
         })
         .catch(error => {
           console.log(error)
@@ -47,47 +56,43 @@ const enhance = compose(
 
   lifecycle({
     componentDidMount() {
+      // initially load images
       this.props.fetchImages();
-      this.interval = setInterval(() => {
-        console.log("fetch")
+
+      // setup refetching the images
+      this.fetchInterval = setInterval(() => {
+        console.log("refetch")
         this.props.fetchImages();
-      }, 8000);
+      }, 8000); // Millisekunden bis nach neuen Bildern gesucht wird.
+
+      // setup replacing the current image with the next one
+      this.updateInterval = setInterval(() => {
+        if (this.props.images.length === 0) {
+          return;
+        }
+        console.log("update image", this.props.imageIndex)
+        this.props.setActiveImage(this.props.images[this.props.imageIndex])
+        this.props.setImageIndex((this.props.imageIndex + 1) % this.props.images.length);
+      }, 4000) // Millisekunden bis ein neues Bild angezeigt wird.
+
     },
     componentDidUpdate(prevProps) {
-      if (prevProps.images !== this.props.images) {
-          this.props.setDisplayCirculation(true)
-      }
+
     },
     componentWillUnmount() {
-      clearInterval(this.interval)
+      clearInterval(this.fetchInterval)
+      clearInterval(this.updateInterval)
     },
   }),
 )
 
-const Images = ({ images, onImageClick }) =>
-  images.map((imagePath, i) => {
-    const fullPath = `http://localhost:5000${imagePath}`
-    return (
-      <Image onClick={() => onImageClick(fullPath)} key={i} src={fullPath} />
-    )
-  })
-
 const ImageViewMainContent = ({
-  activeImageCirculation,
-  images,
   activeImage,
-  onImageClick,
 }) => {
-  if (activeImageCirculation) {
-    return <ImageCirculation images={images} />
-  }
-
-  return activeImage ? (
+  return (
     <ImageWrapper fillParent>
-      <CustomImage src={activeImage} />
+      <CustomImage src={encodeURI(`http://localhost:5000${activeImage}`)} />
     </ImageWrapper>
-  ) : (
-       <Images images={images} onImageClick={image => onImageClick(image)} />
   )
 }
 
@@ -95,8 +100,6 @@ export const ImageView = enhance(
   ({
     images,
     activeImage,
-    setActiveImage,
-    displayCirculation,
   }) => {
     return (
       <ImageContainer>
@@ -104,8 +107,6 @@ export const ImageView = enhance(
           <ImageViewMainContent
             images={images}
             activeImage={activeImage}
-            onImageClick={setActiveImage}
-            activeImageCirculation={displayCirculation}
           />
         </BottomSection>
       </ImageContainer>
@@ -113,11 +114,12 @@ export const ImageView = enhance(
   },
 )
 
-export const Image = ({ src, onClick = () => {} }) => (
+export const Image = ({ src }) => {
+  return (
   <ImageWrapper>
-    <CustomImage src={src} onClick={onClick} />
+    <CustomImage src={src}/>
   </ImageWrapper>
-)
+)}
 
 export const CustomImage = styled.img`
   width: 100%;
@@ -125,19 +127,65 @@ export const CustomImage = styled.img`
 `
 
 
-function newImagestoArrayStart(newList, oldList) {
-  const listEnd = [];
-  const listStart = [];
+function newImagestoArrayStart(newList, oldList, index) {
+  const newEntries = getNewEntries(newList,oldList);
+  const {deletedEntries, stayingEntries} = getDeleted(newList, oldList);
 
+  if(newEntries.length > 0) {
+    console.log("something new")
+    return {
+      newImages: newEntries.concat(stayingEntries),
+      newIndex: 0
+    };
+  }
+
+  if(deletedEntries.length > 0) {
+    console.log("something left")
+    return {
+      newImages: stayingEntries,
+      newIndex: getNewIndex(oldList,deletedEntries,index)
+    };
+  }
+
+  console.log("nothing to do")
+  return {
+    newImages: oldList,
+    newIndex: index
+  };
+}
+
+function getNewEntries(newList, oldList) {
+  const newEntries = [];
   newList.forEach(image => {
-    if(oldList.filter(
-      x => x === image
-    ).length === 1) {
-      listEnd.push(image);
-    }else{
-      listStart.push(image);
+    if (oldList.filter( x => x === image ).length === 0 ) {
+        newEntries.push(image);
     }
   });
-  console.log("start - end",listStart,listEnd)
-  return listStart.concat(listEnd);
+  return newEntries;
+}
+
+function getDeleted(newList, oldList) {
+  const deletedEntries = [];
+  const stayingEntries = [];
+  oldList.forEach(image => {
+    if ( newList.filter( x => x === image ).length === 0 ) {
+      deletedEntries.push(image);
+    }else {
+      stayingEntries.push(image);
+    }
+  });
+  return {deletedEntries, stayingEntries};
+}
+
+function getNewIndex(oldList, deletedEntries, index){
+  let newIndex = index;
+  
+  for (let i = 0; i < index; i++) {
+    const deletedIndex = oldList.indexOf(deletedEntries[i]);
+    if(deletedIndex < index) {
+      newIndex--;
+    }
+  }
+
+  return newIndex;
 }
