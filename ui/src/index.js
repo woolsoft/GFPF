@@ -18,9 +18,3 @@ ReactDOM.render(
   </Router>,
   document.getElementById('root'),
 )
-
-setInterval(
-            function () {
-    window.location.reload(false)
-}, 30000
-)

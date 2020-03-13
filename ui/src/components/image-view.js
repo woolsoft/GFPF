@@ -6,7 +6,7 @@ import withHandlers from 'recompose/withHandlers'
 import lifecycle from 'recompose/lifecycle'
 import withState from 'recompose/withState'
 import { ImageCirculation } from './image-circulation'
-import { PlayButtonWithLeftMargin, Bar, CrossWithLeftMargin, ImageWrapper } from './common'
+import { ImageWrapper } from './common'
 
 const ImageContainer = styled.div`
   height: 100vh;
@@ -20,11 +20,6 @@ const Section = styled.div`
   flex: ${props => props.flex};
 `
 
-const TopSection = styled(Section)`
-  display: flex;
-  align-items: center;
-`
-
 const BottomSection = styled(Section)`
   display: flex;
   flex-wrap: wrap;
@@ -36,32 +31,35 @@ const enhance = compose(
   withState('activeImage', 'setActiveImage', ''),
   withState('displayCirculation', 'setDisplayCirculation', false),
   withHandlers({
-    fetchImages: ({ location, setImages }) => () => {
+    fetchImages: ({ setImages, images }) => () => {
         fetch(`http://localhost:5000/images/omi`)
         .then(res => (res.ok ? res.json() : Promise.reject(res)))
-        .then(({ body }) => setImages(body))
+        .then(({ body }) => {
+          const newImages = newImagestoArrayStart(body, images);
+          console.log(images,body,newImages)
+          setImages(newImages);
+        })
         .catch(error => {
           console.log(error)
         })
     },
   }),
+
   lifecycle({
     componentDidMount() {
-      this.props.fetchImages()
+      this.props.fetchImages();
+      this.interval = setInterval(() => {
+        console.log("fetch")
+        this.props.fetchImages();
+      }, 8000);
     },
-
     componentDidUpdate(prevProps) {
       if (prevProps.images !== this.props.images) {
-        // Closing preview if route changes
-        //if (this.props.activeImage) this.props.setActiveImage('')
-
-        // If switch from one route to another
-        // stop image circulation
-        //if (this.props.display) this.props.setDisplayCirculation(true)
           this.props.setDisplayCirculation(true)
-
-        //this.props.fetchImages()
       }
+    },
+    componentWillUnmount() {
+      clearInterval(this.interval)
     },
   }),
 )
@@ -73,23 +71,6 @@ const Images = ({ images, onImageClick }) =>
       <Image onClick={() => onImageClick(fullPath)} key={i} src={fullPath} />
     )
   })
-
-const ImageViewTopbar = ({
-  displayActiveImageBar,
-  displayCirculationBar,
-  toggleImageCirculation,
-  resetImage,
-}) =>
-  displayActiveImageBar ? (
-    <Bar onButtonPress={resetImage} Icon={CrossWithLeftMargin} />
-  ) : (
-    <Bar
-      onButtonPress={() => toggleImageCirculation(!displayCirculationBar)}
-      Icon={
-        displayCirculationBar ? CrossWithLeftMargin : PlayButtonWithLeftMargin
-      }
-    />
-  )
 
 const ImageViewMainContent = ({
   activeImageCirculation,
@@ -116,20 +97,9 @@ export const ImageView = enhance(
     activeImage,
     setActiveImage,
     displayCirculation,
-    setDisplayCirculation,
   }) => {
     return (
       <ImageContainer>
-        {/*HW Topsection muss weg
-        <TopSection flex={1}>
-          <ImageViewTopbar
-            toggleImageCirculation={setDisplayCirculation}
-            displayActiveImageBar={activeImage}
-            displayCirculationBar={displayCirculation}
-            resetImage={() => setActiveImage('')}
-          />
-        </TopSection>
-          */}
         <BottomSection flex={6}>
           <ImageViewMainContent
             images={images}
@@ -153,3 +123,21 @@ export const CustomImage = styled.img`
   width: 100%;
   height: auto;
 `
+
+
+function newImagestoArrayStart(newList, oldList) {
+  const listEnd = [];
+  const listStart = [];
+
+  newList.forEach(image => {
+    if(oldList.filter(
+      x => x === image
+    ).length === 1) {
+      listEnd.push(image);
+    }else{
+      listStart.push(image);
+    }
+  });
+  console.log("start - end",listStart,listEnd)
+  return listStart.concat(listEnd);
+}

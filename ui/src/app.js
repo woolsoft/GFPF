@@ -1,6 +1,5 @@
 import React from 'react'
 import styled from 'styled-components'
-import { Sidebar } from './components/sidebar.js'
 import { MainContent } from './components/main-content.js'
 
 const ApplicationContainer = styled.div`
@@ -13,8 +12,7 @@ const ApplicationContainer = styled.div`
 export const App = () => {
   return (
     <ApplicationContainer>
-          {/*<Sidebar />*/}
-    <MainContent />
+      <MainContent />
     </ApplicationContainer>
   )
 }

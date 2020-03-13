@@ -8,14 +8,13 @@ const enhance = compose(
   lifecycle({
     componentDidMount() {
       let imageIndex = 0
-      const images = this.props.images
-      const amountOfImages = images.length
+      const amountOfImages = this.props.images.length
       this.props.setCurrentImage(this.props.images[imageIndex])
       this.interval = setInterval(() => {
-        // "Looping" trough the images array
+        // "Looping" through the images array
         imageIndex = (imageIndex + 1) % amountOfImages
-          this.props.setCurrentImage(images[imageIndex])
-      }, 2000)
+          this.props.setCurrentImage(this.props.images[imageIndex])
+      }, 4000)
     },
 
     componentWillUnmount() {
